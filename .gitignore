@@ -1,0 +1,6 @@
+geo/node_modules
+build/tree.ged
+build/ged.json
+build/test.html
+__pycache__/
+*.png
