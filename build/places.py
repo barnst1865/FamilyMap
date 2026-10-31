@@ -114,7 +114,7 @@ P = {
 'genova':('Genoa',44.407,8.934,False),
 'cherbourg':('Cherbourg',49.640,-1.616,False),
 # --- Ireland, Galicia
-'cork':('Kippagh, Co. Cork',51.950,-8.700,True),
+'cork':('Co. Cork, Ireland',51.950,-8.700,True),
 'kawenczyn':('Kawęczyn, Galicia (which one unknown)',50.050,21.100,True),
 # --- England
 'gainford':('Gainford, Co. Durham',54.546,-1.737,False),
@@ -173,4 +173,27 @@ P.update({
 'newbrunswick':('New Brunswick, New Jersey',40.486,-74.452,False),
 'westcamp':('West Camp, New York',42.117,-73.940,False),
 'kingston':('Kingston, New York',41.927,-74.000,False),
+})
+P.update({
+'queensbury':('Queensbury, New York',43.345,-73.690,False),
+'chester':('Chester (Chestertown), New York',43.653,-73.800,False),
+'queenstown':('Queenstown (Cobh)',51.851,-8.296,False),
+'heighington':('Heighington, Co. Durham',54.598,-1.616,False),
+'stedouard':('Saint-Édouard, near La Prairie',45.235,-73.515,False),
+'beauharnois':('Beauharnois seigniory',45.310,-73.870,True),
+'howick':('Howick, Québec',45.183,-73.848,False),
+'ormstown':('Ormstown, Québec',45.130,-74.000,False),
+'havre':('Le Havre',49.494,0.108,False),
+'newhaven':('New Haven, Connecticut',41.308,-72.928,False),
+'cromwell':('Cromwell, Connecticut',41.595,-72.645,False),
+'berlinct':('Berlin, Connecticut',41.621,-72.746,False),
+'hartford':('Hartford, Connecticut',41.764,-72.685,False),
+'bavaria':('Bavaria (place not recorded)',48.900,11.400,True),
+'ehlscheid':('Ehlscheid, near Rengsdorf',50.517,7.483,False),
+'petrograd':('St Petersburg (Petrograd)',59.939,30.316,False),
+'vladivostok':('Vladivostok',43.116,131.886,False),
+'yokohama':('Japan',35.444,139.638,True),
+'batavia':('Dutch East Indies (Java)',-6.200,106.816,True),
+'tampa':('Tampa, Florida',27.950,-82.457,False),
+'labelle':('LaBelle, Florida',26.762,-81.438,False),
 })

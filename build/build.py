@@ -209,7 +209,7 @@ for pid,p in people.items():
     if d and not d[1]:
         d=(d[0], stops[-1][1] if stops else b[1], True)
     if d and not d[0]: d=None
-    conf='claimed' if CLAIMED.search(nm) and p['depth']>=9 else gconf(pid)
+    conf=gconf(pid)
     rec=dict(id=pid,name=nm,sex=p['sex'],branch=p['branch'],depth=p['depth'],frac=p['frac'],
              line=pp['name'].split()[-1] if pp['name'] else '',path=p['path'],conf=conf,
              b=[b[0],b[1],b[2],'Born'],d=[d[0],d[1],d[2],'Dies'] if d else None,
@@ -227,7 +227,7 @@ def mwalk(pid,depth,lo,hi,path):
 mwalk('KHEAD',0,0,1,[]); mwalk('RHEAD',0,0,1,[])
 for p in manual.PEOPLE:
     if p['rel']=='rel':
-        par=M[p['father']]; p['depth']=par['depth']-1; p['frac']=M['L-016']['frac'] if p['id']=='L-014' else M['L-020']['frac']; p['path']=M['L-016']['path'] if p['id']=='L-014' else M['L-020']['path']
+        par=M[p['father']]; p['depth']=par['depth']-1; sib='L-016' if p['id'] in('L-014','L-013') else 'L-020'; p['frac']=M[sib]['frac']; p['path']=M[sib]['path']
 for p in manual.PEOPLE:
     if p['rel']=='head': continue
     if 'depth' not in p: print('UNLINKED',p['id']); continue
@@ -269,6 +269,34 @@ for r in out:
     # rebuild path from GEDCOM ancestry chain
     chain=[]; pid=r['id']; cur=pid
     # walk down via people[] parent links is hard; use stored path length and recompute top-down
+import research
+def conv(t):
+    return [t[0],t[1],t[2],t[3]] if t else None
+# additions first (keyed on original names)
+keyidx={(r['name'],r['depth']):r for r in out if r['src']=='Ancestry tree'}
+for ck,which,rec in research.ADD:
+    c=keyidx[ck]; w=1/2**c['depth']
+    nr=dict(id=rec['id'],name=rec['name'],sex=rec['sex'],branch=c['branch'],depth=c['depth']+1,
+            frac=c['frac']+(-w/4 if which=='father' else w/4),line=rec['line'],path=None,conf=rec['conf'],
+            b=conv(rec['b']),d=conv(rec.get('d')),stops=[list(s) for s in rec.get('stops',[])],
+            last=rec.get('last'),rel='anc',appear=None,note=rec.get('note',''),src=rec['src'],
+            parent_of=c['id'],which=which)
+    out.append(nr)
+for r in list(out):
+    if r['src']!='Ancestry tree': continue
+    if r['name'] in research.REMOVE: out.remove(r); continue
+    o=research.OVR.get((r['name'],r['depth']))
+    if not o: continue
+    for k,v in o.items():
+        if k=='b': r['b']=conv(v); r['appear']=None
+        elif k=='d': r['d']=conv(v)
+        elif k=='stops': r['stops']=[list(s) for s in v]
+        elif k=='src': r['src']=v
+        else: r[k]=v
+    if 'd' in o and o['d'] is None and 'last' not in o: r['last']=max([s[0] for s in r['stops']]+[r['b'][0]])
+    if o.get('d'): r['last']=None
+    r['ovr']=True
+byid={r['id']:r for r in out}
 for h,bname in heads.items():
     def down(pid,path):
         f,m=gparents(pid)
@@ -278,6 +306,8 @@ for h,bname in heads.items():
             if xx in byid:
                 rr=byid[xx]; rr['path']=path+[rr['line']]
                 down(x,rr['path'])
+                for a in out:
+                    if a.get('parent_of')==xx: a['path']=rr['path']+[a['line']]
             elif x in people:
                 down(x,path)
     down(h,[])

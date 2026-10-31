@@ -202,7 +202,7 @@ body.land .toast{top:calc(8px + env(safe-area-inset-top,0px)); bottom:auto; max-
 
 <div id="timeline">
   <div class="tlhead"><span>Ancestors living, by branch</span><span id="tlhint">Drag along the timeline to move through the years</span></div>
-  <svg id="tl" role="slider" tabindex="0" aria-label="Year" aria-valuemin="1480" aria-valuemax="2008" aria-valuenow="1912"></svg>
+  <svg id="tl" role="slider" tabindex="0" aria-label="Year" aria-valuemin="1560" aria-valuemax="2021" aria-valuenow="1912"></svg>
 </div>
 
 <div id="personslot"></div>
@@ -211,7 +211,7 @@ body.land .toast{top:calc(8px + env(safe-area-inset-top,0px)); bottom:auto; max-
   <button class="btn panelclose" id="closepanel">Close</button>
   <div>
     <div class="kicker">Family atlas</div>
-    <h1>Where the four branches lived, 1480 to today</h1>
+    <h1>Where the four branches lived, since the 1560s</h1>
     <p class="lede">Each dot is one ancestor, placed where the records put them in that year. Colors fade as the tree reaches further back. Click a dot to follow one person.</p>
   </div>
   <section id="person" hidden></section>
@@ -223,8 +223,8 @@ body.land .toast{top:calc(8px + env(safe-area-inset-top,0px)); bottom:auto; max-
     <h2>Show</h2>
     <div class="opts">
       <label><input type="checkbox" id="optTrails" checked> All past routes, faintly</label>
-      <label><input type="checkbox" id="optRel" checked> Close relatives (Peter and Virve Leoke)</label>
-      <label><input type="checkbox" id="optClaimed" checked> Claimed noble lines (doubtful)</label>
+      <label><input type="checkbox" id="optRel" checked> Close relatives (Peter, Hans and Virve Leoke)</label>
+      <label><input type="checkbox" id="optClaimed" checked> Doubtful links in the tree</label>
       <label><input type="checkbox" id="optLabels" checked> Place names</label>
     </div>
   </section>
@@ -238,7 +238,7 @@ body.land .toast{top:calc(8px + env(safe-area-inset-top,0px)); bottom:auto; max-
   </section>
   <section class="fine">
     <h2>About the data</h2>
-    <p>Koik, Leoke and Rodilitz–Zaslow places come from the family research of October 2026 (parish registers, revisions, passenger lists, censuses). Goundrey and Romegialli places come from the Ancestry tree export of 31 October 2026 and have mostly not been checked yet.</p>
+    <p>Koik, Leoke and Rodilitz–Zaslow places come from the family research of October 2026 (parish registers, revisions, passenger lists, censuses). Goundrey and Romegialli places start from the Ancestry tree export of 31 October 2026, corrected with the research done since: the Durham, Yorkshire, Québec, Glens Falls, Galician, Italian and Connecticut generations are now checked against records. The older Palatine generations in New York and Germany are still the tree’s and mostly unchecked. The Rockefeller descent from French and Nuremberg nobility was shown to be a myth and has been removed.</p>
     <p>Where a year or place is only roughly known, the dot is hollow. Farm sites around Viljandi and Halliste are placed approximately. Moves between records are drawn as straight journeys at the time of the next record, so a move may have happened earlier than shown. Some residences are inferred from where a child was born.</p>
     <p>Generations are counted from the youngest generation, where all four branches meet. Living people are not shown.</p>
   </section>
@@ -262,14 +262,14 @@ const BRANCHES=[
   {id:'goundrey',name:'Goundrey',heads:'Ancestors of George Eugene Goundrey and Stacia Czepiel'},
   {id:'romegialli',name:'Romegialli',heads:'Ancestors of Emilio Romegialli and Mary Theresa Huber'}];
 const BI={}; BRANCHES.forEach((b,i)=>BI[b.id]=i);
-const Y0=1480, Y1=2008, START_VIEW_YEAR=1912;
+const Y0=1560, Y1=2021, START_VIEW_YEAR=1912;
 const CONF={
   doc:{label:'From the family research records',solid:true},
   rec:{label:'Ancestry tree, with a record attached',solid:true},
   prob:{label:'Probable identification',solid:false},
   tree:{label:'Ancestry tree only, not yet checked',solid:false},
   approx:{label:'Place or dates only approximate',solid:false},
-  claimed:{label:'Claimed noble lineage, doubtful',solid:false,dash:true}};
+  claimed:{label:'Doubtful link in the tree',solid:false,dash:true}};
 const ERAS=[
   [1709.2,1711.5,'The Palatine exodus from the Rhineland to London and New York'],
   [1816,1826,'Serfdom ends in Estonia and Livonia; peasants take surnames'],
@@ -707,7 +707,7 @@ function renderBranches(){
 function drawRamps(){}
 function renderKey(){
   const el=document.getElementById('keyrow'); el.innerHTML='';
-  const items=[['Recorded',true,false],['Probable, unchecked or approximate',false,false],['Claimed, doubtful',false,true],['Travelling',null,false]];
+  const items=[['Recorded',true,false],['Probable, unchecked or approximate',false,false],['Doubtful link',false,true],['Travelling',null,false]];
   items.forEach(([t,solid,dash])=>{ const s=document.createElement('span'); const c=document.createElement('canvas'); c.width=28; c.height=28; c.style.width='14px'; c.style.height='14px';
     const g=c.getContext('2d'); g.scale(2,2); g.beginPath(); g.arc(7,7,4.5,0,7);
     if(solid===null){ g.globalAlpha=.25; g.fillStyle=COL.koik; g.beginPath(); g.arc(7,7,6.5,0,7); g.fill(); g.globalAlpha=1; g.beginPath(); g.arc(7,7,3.5,0,7); g.fillStyle=COL.koik; g.fill(); }
@@ -790,7 +790,7 @@ function stepCamera(instant){
 /* ---------- timeline ---------- */
 const tl=d3.select('#tl');
 let tlx=null;
-const BANDS=[1480,1700,1850,Y1];
+const BANDS=[Y0,1700,1850,Y1];
 let countsByYear=null;
 function computeCounts(){
   countsByYear=[];
@@ -810,11 +810,11 @@ function drawTimeline(){
   const area=d3.area().x(d=>tlx(d.data.y)).y0(d=>yS(d[0])).y1(d=>yS(d[1])).curve(d3.curveMonotoneX);
   tl.append('g').selectAll('path').data(stack).join('path').attr('d',area).attr('fill',d=>COL[d.key]).attr('fill-opacity',0.8);
   // band separators and ticks
-  const ticks=[1500,1600,1700,1750,1800,1850,1875,1900,1925,1950,1975,2000];
+  const ticks=[1600,1650,1700,1750,1800,1850,1875,1900,1925,1950,1975,2000];
   const g=tl.append('g');
   g.selectAll('line').data(ticks).join('line').attr('x1',d=>tlx(d)).attr('x2',d=>tlx(d)).attr('y1',h-16).attr('y2',h-12).attr('stroke',COL.faint);
   g.selectAll('text').data(ticks).join('text').attr('x',d=>tlx(d)).attr('y',h-2).attr('text-anchor','middle').text(d=>d)
-    .style('display',d=>(w<520 && [1600,1750,1875,1925,1975].includes(d))?'none':null);
+    .style('display',d=>(w<520 && [1650,1750,1875,1925,1975].includes(d))?'none':null);
   tl.append('line').attr('x1',8).attr('x2',w-8).attr('y1',h-16).attr('y2',h-16).attr('stroke',COL.border);
   tl.append('line').attr('id','cursor').attr('y1',2).attr('y2',h-14).attr('stroke',COL.ink).attr('stroke-width',1.5);
   tl.append('circle').attr('id','knob').attr('r',5).attr('cy',h-16).attr('fill',COL.ink).attr('stroke',COL.land).attr('stroke-width',2);
