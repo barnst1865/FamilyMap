@@ -148,7 +148,31 @@ button{font:inherit; color:inherit}
 #tapcard .go{margin-top:6px; border:1px solid var(--border); background:var(--panel-2); border-radius:var(--r); padding:5px 9px; font-size:12.5px; cursor:pointer; font-weight:500}
 #personslot:empty{display:none}
 #personslot{padding-block:12px 0; padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px)); background:var(--panel)}
-@media (prefers-reduced-motion: reduce){ .toast{transition:none} }
+/* landscape phone: the map fills the screen; everything else floats or tucks away (set by script) */
+.landbar, .panelclose, #scrim{display:none}
+body.land{display:block; overflow:hidden; height:100%}
+body.land #mapwrap{position:fixed; inset:0; height:auto; min-height:0}
+body.land .hud{top:calc(8px + env(safe-area-inset-top,0px)); left:max(10px, env(safe-area-inset-left,0px)); flex-direction:row; align-items:center; gap:10px;
+  padding:5px 6px 5px 12px; border-radius:var(--r); background:color-mix(in srgb, var(--panel) 86%, transparent); border:1px solid var(--rule); max-width:none}
+body.land .hud .kicker, body.land .hud .era, body.land .hud .counts, body.land .hud .seg, body.land #playlbl{display:none}
+body.land .hud .year{font-size:32px; line-height:1; text-shadow:none}
+body.land .hud .controls{margin:0}
+body.land .hud .btn{padding:8px 10px}
+body.land .views, body.land .scale-note{display:none}
+body.land .landbar{display:flex; gap:6px; position:absolute; top:calc(8px + env(safe-area-inset-top,0px)); right:max(10px, env(safe-area-inset-right,0px))}
+.landbar select{font:inherit; font-size:13px; color:var(--ink); background:var(--chip); border:1px solid var(--border); border-radius:var(--r); padding:7px 8px; max-width:44vw}
+body.land #timeline{position:fixed; z-index:4; left:max(10px, env(safe-area-inset-left,0px)); right:max(10px, env(safe-area-inset-right,0px)); bottom:calc(6px + env(safe-area-inset-bottom,0px));
+  border:1px solid var(--rule); border-radius:var(--r); padding:2px 10px 0; background:color-mix(in srgb, var(--panel) 88%, transparent)}
+body.land .tlhead{display:none}
+body.land #tl{height:40px}
+body.land #personslot{display:none}
+body.land #panel{position:fixed; z-index:20; top:0; right:0; bottom:0; width:min(390px, 88vw); border-left:1px solid var(--rule); background:var(--panel);
+  transform:translateX(105%); transition:transform .25s ease; box-shadow:-8px 0 24px rgba(0,0,0,.18)}
+body.land.panel-open #panel{transform:none}
+body.land .panelclose{display:inline-flex; align-self:flex-end}
+body.land.panel-open #scrim{display:block; position:fixed; inset:0; z-index:15; background:rgba(0,0,0,.28)}
+body.land .toast{top:calc(8px + env(safe-area-inset-top,0px)); bottom:auto; max-width:46vw; left:50%}
+@media (prefers-reduced-motion: reduce){ .toast{transition:none} body.land #panel{transition:none} }
 </style>
 
 <div id="mapwrap">
@@ -171,6 +195,7 @@ button{font:inherit; color:inherit}
   <div class="views" id="views" role="group" aria-label="Map view"></div>
   <div class="toast" id="toast" aria-live="polite"><span class="ty" id="toasty"></span><span id="toastt"></span></div>
   <div class="tip" id="tip" hidden></div>
+  <div class="landbar"><select id="viewsel" aria-label="Map view"></select><button class="btn" id="openpanel">Details</button></div>
   <div class="tip" id="tapcard" hidden></div>
   <div class="scale-note">Modern borders · Natural Earth · scroll or pinch to zoom</div>
 </div>
@@ -181,7 +206,9 @@ button{font:inherit; color:inherit}
 </div>
 
 <div id="personslot"></div>
+<div id="scrim"></div>
 <aside id="panel">
+  <button class="btn panelclose" id="closepanel">Close</button>
   <div>
     <div class="kicker">Family atlas</div>
     <h1>Where the four branches lived, 1480 to today</h1>
@@ -359,9 +386,9 @@ function resize(){
   requestDraw(); drawTimeline();
 }
 function fitTransform(x0,y0,x1,y1,maxK){
-  const pad=PHONE?28:Math.max(40,Math.min(CW,CH)*0.12);
-  const topPad=PHONE?30:Math.min(CH*0.34,190);
-  const botPad=PHONE?58:pad;
+  const pad=LAND?30:PHONE?28:Math.max(40,Math.min(CW,CH)*0.12);
+  const topPad=LAND?62:PHONE?30:Math.min(CH*0.34,190);
+  const botPad=LAND?64:PHONE?58:pad;
   const w=Math.max(1e-3,x1-x0), h=Math.max(1e-3,y1-y0);
   const availW=CW-pad*2, availH=CH-botPad-topPad;
   let k=Math.min(availW/w, availH/h, maxK||14); k=Math.max(k,0.9);
@@ -390,13 +417,20 @@ function applyView(id,instant){
 function setFollow(on,view){
   S.follow=on; S.view=view||(on?'follow':'free');
   document.querySelectorAll('.view').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===S.view)));
+  const vs=document.getElementById('viewsel'); if(vs) vs.value=S.view;
 }
 const viewsEl=document.getElementById('views');
 VIEWS.forEach(v=>{const b=document.createElement('button');b.className='view';b.dataset.v=v.id;b.textContent=v.name;
   b.setAttribute('aria-pressed',String(v.id==='follow'));
   b.onclick=()=>{ if(v.id==='follow'){setFollow(true);} else {setFollow(false,v.id); applyView(v.id);} requestDraw(); };
   viewsEl.appendChild(b);});
+const viewsel=document.getElementById('viewsel');
+VIEWS.forEach(v=>{const o=document.createElement('option'); o.value=v.id; o.textContent=v.id==='follow'?'Follow the family':v.name; viewsel.appendChild(o);});
+const freeOpt=document.createElement('option'); freeOpt.value='free'; freeOpt.textContent='Your own view'; freeOpt.hidden=true; viewsel.appendChild(freeOpt);
+viewsel.onchange=()=>{ const id=viewsel.value; if(id==='follow') setFollow(true); else if(id!=='free'){ setFollow(false,id); applyView(id);} requestDraw(); };
 const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const landMQ=window.matchMedia('(orientation: landscape) and (max-height: 560px)');
+let LAND=landMQ.matches;
 const phoneMQ=window.matchMedia('(max-width: 860px)'), coarseMQ=window.matchMedia('(pointer: coarse)');
 let PHONE=phoneMQ.matches, COARSE=coarseMQ.matches||PHONE;
 
@@ -602,7 +636,7 @@ canvas.addEventListener('click',ev=>{
   const m=document.createElement('div'); m.className='m'; m.textContent=BRANCHES[BI[p.branch]].name+' · '+p.line+' line · '+genLabel(p);
   const w=document.createElement('div'); w.textContent=st?(st.moving?('Travelling: '+PL[st.m.from].short+' → '+PL[st.m.to].short):placeName(st.pl)):'';
   const go=document.createElement('button'); go.className='go'; go.textContent='Full journey ↓';
-  go.onclick=()=>{ tapcard.hidden=true; personEl.scrollIntoView({behavior:reduced?'auto':'smooth',block:'start'}); };
+  go.onclick=()=>{ tapcard.hidden=true; if(LAND){ openPanel(true); panelEl.scrollTop=0; } else personEl.scrollIntoView({behavior:reduced?'auto':'smooth',block:'start'}); };
   tapcard.append(n,m,w,go); tapcard.hidden=false;
   const tw=tapcard.offsetWidth, th=tapcard.offsetHeight;
   let tx=Math.max(8,Math.min(CW-tw-8,h.x-tw/2)), ty=h.y-th-14; if(ty<8) ty=h.y+16;
@@ -765,7 +799,7 @@ function computeCounts(){
     countsByYear.push(row); }
 }
 function drawTimeline(){
-  const el=document.getElementById('tl'); const w=el.getBoundingClientRect().width||600, h=78;
+  const el=document.getElementById('tl'); const w=el.getBoundingClientRect().width||600, h=LAND?40:78;
   tl.attr('viewBox','0 0 '+w+' '+h);
   tlx=d3.scaleLinear().domain(BANDS).range([8,8+(w-16)*0.18,8+(w-16)*0.46,w-8]).clamp(true);
   tl.selectAll('*').remove();
@@ -841,13 +875,19 @@ new MutationObserver(onTheme).observe(document.documentElement,{attributes:true,
 /* ---------- boot ---------- */
 computeColors(); buildWarp(); computeCounts();
 const hudEl=document.querySelector('.hud'), mapwrap=document.getElementById('mapwrap'), slot=document.getElementById('personslot'), panelEl=document.getElementById('panel');
+function openPanel(on){ document.body.classList.toggle('panel-open',on); }
+document.getElementById('openpanel').onclick=()=>openPanel(true);
+document.getElementById('closepanel').onclick=()=>openPanel(false);
+document.getElementById('scrim').onclick=()=>openPanel(false);
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape') openPanel(false); });
 function applyLayout(){
-  PHONE=phoneMQ.matches; COARSE=coarseMQ.matches||PHONE;
+  LAND=landMQ.matches; PHONE=!LAND && phoneMQ.matches; COARSE=coarseMQ.matches||PHONE||LAND;
+  document.body.classList.toggle('land',LAND); if(!LAND) openPanel(false);
   if(PHONE){ hudEl.classList.add('band'); mapwrap.parentNode.insertBefore(hudEl,mapwrap); slot.appendChild(personEl); }
-  else { hudEl.classList.remove('band'); mapwrap.insertBefore(hudEl,mapwrap.querySelector('.views')); panelEl.insertBefore(personEl,panelEl.children[1]); }
-  tapcard.hidden=true; setPlayUI(); resize(); if(S.follow) stepCamera(true);
+  else { hudEl.classList.remove('band'); mapwrap.insertBefore(hudEl,mapwrap.querySelector('.views')); panelEl.querySelector(':scope > div').after(personEl); }
+  tapcard.hidden=true; setPlayUI(); resize(); drawTimeline(); if(S.follow) stepCamera(true);
 }
-phoneMQ.addEventListener('change',applyLayout); coarseMQ.addEventListener('change',applyLayout);
+phoneMQ.addEventListener('change',applyLayout); landMQ.addEventListener('change',applyLayout); coarseMQ.addEventListener('change',applyLayout);
 window.addEventListener('resize',()=>{ resize(); if(S.follow) stepCamera(true); });
 applyLayout();
 resize(); setFollow(true); stepCamera(true); frameUpdate(); setPlayUI(); requestDraw();
