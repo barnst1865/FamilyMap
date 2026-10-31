@@ -128,11 +128,26 @@ button{font:inherit; color:inherit}
   .views{top:auto; bottom:10px; left:max(16px, env(safe-area-inset-left,0px)); right:max(16px, env(safe-area-inset-right,0px)); max-width:none; flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; scrollbar-width:none}
   .view{flex:0 0 auto}
   .counts{font-size:12px}
-  .year{font-size:58px}
-  .era{font-size:15px}
-  .toast{bottom:auto; top:calc(150px + env(safe-area-inset-top,0px))}
+  #mapwrap{height:min(66vh, 620px); min-height:420px}
+  .toast{bottom:auto; top:12px}
+  #tlhint{display:none}
   .scale-note{display:none}
 }
+/* phone layout: the HUD becomes a band above the map (set by script) */
+.hud.band{position:static; max-width:none; pointer-events:auto; background:var(--panel); border-bottom:1px solid var(--rule);
+  padding-block:10px 8px; padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px));
+  display:grid; grid-template-columns:auto minmax(0,1fr); gap:2px 14px; align-items:center}
+.hud.band .kicker{display:none}
+.hud.band .year{grid-column:1; grid-row:1 / 3; font-size:46px; text-shadow:none}
+.hud.band .controls{grid-column:2; grid-row:1; margin:0; flex-wrap:nowrap}
+.hud.band .counts{grid-column:2; grid-row:2; text-shadow:none; font-size:12px; gap:2px 9px}
+.hud.band .era{grid-column:1 / -1; grid-row:3; font-size:14px; min-height:0; text-shadow:none}
+.hud.band .btn{padding:7px 12px}
+.hud.band .seg button{padding:7px 8px}
+#tapcard{pointer-events:auto; z-index:6}
+#tapcard .go{margin-top:6px; border:1px solid var(--border); background:var(--panel-2); border-radius:var(--r); padding:5px 9px; font-size:12.5px; cursor:pointer; font-weight:500}
+#personslot:empty{display:none}
+#personslot{padding-block:12px 0; padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px)); background:var(--panel)}
 @media (prefers-reduced-motion: reduce){ .toast{transition:none} }
 </style>
 
@@ -156,6 +171,7 @@ button{font:inherit; color:inherit}
   <div class="views" id="views" role="group" aria-label="Map view"></div>
   <div class="toast" id="toast" aria-live="polite"><span class="ty" id="toasty"></span><span id="toastt"></span></div>
   <div class="tip" id="tip" hidden></div>
+  <div class="tip" id="tapcard" hidden></div>
   <div class="scale-note">Modern borders · Natural Earth · scroll or pinch to zoom</div>
 </div>
 
@@ -164,6 +180,7 @@ button{font:inherit; color:inherit}
   <svg id="tl" role="slider" tabindex="0" aria-label="Year" aria-valuemin="1480" aria-valuemax="2008" aria-valuenow="1912"></svg>
 </div>
 
+<div id="personslot"></div>
 <aside id="panel">
   <div>
     <div class="kicker">Family atlas</div>
@@ -330,7 +347,8 @@ function isDark(){const l=d3.hcl(cssVar('--land')).l; return l<50;}
 const canvas=document.getElementById('map'); const ctx=canvas.getContext('2d');
 let CW=0,CH=0,DPR=1;
 let T=d3.zoomIdentity, target=null;
-const zoom=d3.zoom().scaleExtent([0.8,90]).on('start',ev=>{if(ev.sourceEvent){canvas.classList.add('dragging');setFollow(false,'free');}})
+const zoom=d3.zoom().scaleExtent([0.8,90]).on('start',ev=>{if(ev.sourceEvent && ev.sourceEvent.type!=='click'){canvas.classList.add('dragging');}})
+  .on('zoom.user',ev=>{ if(ev.sourceEvent){ if(S.follow||S.view!=='free') setFollow(false,'free'); tapcard.hidden=true; } })
   .on('zoom',ev=>{T=ev.transform; if(!S.playing) requestDraw();}).on('end',()=>canvas.classList.remove('dragging'));
 const csel=d3.select(canvas).call(zoom).on('dblclick.zoom',null);
 function resize(){
@@ -341,10 +359,11 @@ function resize(){
   requestDraw(); drawTimeline();
 }
 function fitTransform(x0,y0,x1,y1,maxK){
-  const pad=Math.max(40,Math.min(CW,CH)*0.12);
-  const topPad=Math.min(CH*0.34,190);
+  const pad=PHONE?28:Math.max(40,Math.min(CW,CH)*0.12);
+  const topPad=PHONE?30:Math.min(CH*0.34,190);
+  const botPad=PHONE?58:pad;
   const w=Math.max(1e-3,x1-x0), h=Math.max(1e-3,y1-y0);
-  const availW=CW-pad*2, availH=CH-pad-topPad;
+  const availW=CW-pad*2, availH=CH-botPad-topPad;
   let k=Math.min(availW/w, availH/h, maxK||14); k=Math.max(k,0.9);
   const cx=(x0+x1)/2, cy=(y0+y1)/2;
   return d3.zoomIdentity.translate(CW/2-cx*k, topPad+availH/2-cy*k).scale(k);
@@ -378,6 +397,8 @@ VIEWS.forEach(v=>{const b=document.createElement('button');b.className='view';b.
   b.onclick=()=>{ if(v.id==='follow'){setFollow(true);} else {setFollow(false,v.id); applyView(v.id);} requestDraw(); };
   viewsEl.appendChild(b);});
 const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phoneMQ=window.matchMedia('(max-width: 860px)'), coarseMQ=window.matchMedia('(pointer: coarse)');
+let PHONE=phoneMQ.matches, COARSE=coarseMQ.matches||PHONE;
 
 /* ---------- positions at a year ---------- */
 function stateAt(p,y){
@@ -447,7 +468,7 @@ function draw(){
   ctx.lineWidth=0.7/k; ctx.strokeStyle=COL.border; ctx.stroke(k>2.2?geo.bord50:geo.bord110);
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const sx=x=>T.x+k*x, sy=v=>T.y+k*v;
-  const r=Math.max(3,Math.min(6.2,3+Math.log2(Math.max(1,k))*0.75));
+  const r=Math.max(PHONE?3.6:3,Math.min(6.4,(PHONE?3.6:3)+Math.log2(Math.max(1,k))*0.75));
   const vis=people.filter(visiblePerson);
   const dimLine=p=>S.focusLine && !(p.branch===S.focusLine.b && (p.line===S.focusLine.l));
   // footprints
@@ -549,8 +570,9 @@ function lifeSpan(p){
   const b=p.appear!=null?'?':Math.floor(p.b[0]); const d=p.d?Math.floor(p.d[0]):'';
   return (p.b[2]&&p.appear==null?'c. ':'')+b+'–'+(d||(p.endKnown?'':'?'));
 }
-function hitTest(mx,my){ let best=null,bd=1e9; hoverHits.forEach(h=>{const d=Math.hypot(h.x-mx,h.y-my); if(d<bd){bd=d;best=h;}}); return bd<10?best:null; }
-canvas.addEventListener('mousemove',ev=>{
+function hitTest(mx,my){ let best=null,bd=1e9; hoverHits.forEach(h=>{const d=Math.hypot(h.x-mx,h.y-my); if(d<bd){bd=d;best=h;}}); return bd<(COARSE?22:10)?best:null; }
+canvas.addEventListener('pointermove',ev=>{
+  if(ev.pointerType!=='mouse') return;
   const rc=canvas.getBoundingClientRect(); const mx=ev.clientX-rc.left, my=ev.clientY-rc.top;
   const h=hitTest(mx,my);
   if(!h){tip.hidden=true; canvas.style.cursor=''; return;}
@@ -568,12 +590,26 @@ canvas.addEventListener('mousemove',ev=>{
   tip.style.left=tx+'px'; tip.style.top=ty+'px';
 });
 canvas.addEventListener('mouseleave',()=>{tip.hidden=true;});
+const tapcard=document.getElementById('tapcard');
 canvas.addEventListener('click',ev=>{
-  const rc=canvas.getBoundingClientRect(); const h=hitTest(ev.clientX-rc.left, ev.clientY-rc.top);
-  select(h?h.p.id:null);
+  const rc=canvas.getBoundingClientRect(); const mx=ev.clientX-rc.left, my=ev.clientY-rc.top; const h=hitTest(mx,my);
+  if(!COARSE){ select(h?h.p.id:null); return; }
+  if(!h){ tapcard.hidden=true; select(null); return; }
+  select(h.p.id,true);
+  const p=h.p, st=stateAt(p,S.year);
+  tapcard.innerHTML='';
+  const n=document.createElement('div'); n.className='n'; n.textContent=p.name+'  '+lifeSpan(p);
+  const m=document.createElement('div'); m.className='m'; m.textContent=BRANCHES[BI[p.branch]].name+' · '+p.line+' line · '+genLabel(p);
+  const w=document.createElement('div'); w.textContent=st?(st.moving?('Travelling: '+PL[st.m.from].short+' → '+PL[st.m.to].short):placeName(st.pl)):'';
+  const go=document.createElement('button'); go.className='go'; go.textContent='Full journey ↓';
+  go.onclick=()=>{ tapcard.hidden=true; personEl.scrollIntoView({behavior:reduced?'auto':'smooth',block:'start'}); };
+  tapcard.append(n,m,w,go); tapcard.hidden=false;
+  const tw=tapcard.offsetWidth, th=tapcard.offsetHeight;
+  let tx=Math.max(8,Math.min(CW-tw-8,h.x-tw/2)), ty=h.y-th-14; if(ty<8) ty=h.y+16;
+  tapcard.style.left=tx+'px'; tapcard.style.top=ty+'px';
 });
 const personEl=document.getElementById('person');
-function select(id){
+function select(id,quiet){
   S.selected=id; requestDraw();
   if(!id){personEl.hidden=true; return;}
   const p=byId[id];
@@ -603,7 +639,6 @@ function select(id){
     csel.transition().duration(reduced?0:900).call(zoom.transform,t); };
   personEl.appendChild(go);
   personEl.hidden=false;
-  if(window.matchMedia('(max-width: 860px)').matches) personEl.scrollIntoView({behavior:reduced?'auto':'smooth',block:'nearest'});
 }
 /* ---------- side panel ---------- */
 const branchesEl=document.getElementById('branches');
@@ -745,7 +780,7 @@ function drawTimeline(){
   const g=tl.append('g');
   g.selectAll('line').data(ticks).join('line').attr('x1',d=>tlx(d)).attr('x2',d=>tlx(d)).attr('y1',h-16).attr('y2',h-12).attr('stroke',COL.faint);
   g.selectAll('text').data(ticks).join('text').attr('x',d=>tlx(d)).attr('y',h-2).attr('text-anchor','middle').text(d=>d)
-    .style('display',d=>(w<520 && [1750,1875,1925,1975].includes(d))?'none':null);
+    .style('display',d=>(w<520 && [1600,1750,1875,1925,1975].includes(d))?'none':null);
   tl.append('line').attr('x1',8).attr('x2',w-8).attr('y1',h-16).attr('y2',h-16).attr('stroke',COL.border);
   tl.append('line').attr('id','cursor').attr('y1',2).attr('y2',h-14).attr('stroke',COL.ink).attr('stroke-width',1.5);
   tl.append('circle').attr('id','knob').attr('r',5).attr('cy',h-16).attr('fill',COL.ink).attr('stroke',COL.land).attr('stroke-width',2);
@@ -767,7 +802,7 @@ tlEl.addEventListener('keydown',ev=>{ const step=ev.shiftKey?10:1;
 /* ---------- play loop ---------- */
 const playBtn=document.getElementById('play'), playLbl=document.getElementById('playlbl'), playIcon=document.getElementById('playicon');
 function setPlayUI(){ playIcon.innerHTML=S.playing?'<path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/>':'<path d="M4 2.5v11l9-5.5z"/>';
-  playLbl.textContent=S.playing?'Pause':(S.touched?(S.year>=Y1-0.01?'Play again':'Play'):'Play from the beginning'); playBtn.setAttribute('aria-label',playLbl.textContent); }
+  playLbl.textContent=S.playing?'Pause':(S.touched?(S.year>=Y1-0.01?'Play again':'Play'):(PHONE?'Play':'Play from the beginning')); playBtn.setAttribute('aria-label',playLbl.textContent); }
 function pause(){ S.playing=false; setPlayUI(); }
 function play(){
   if(!S.touched){ S.touched=true; setYear(Y0,false); setFollow(true); stepCamera(true); }
@@ -805,9 +840,18 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',onTh
 new MutationObserver(onTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 /* ---------- boot ---------- */
 computeColors(); buildWarp(); computeCounts();
+const hudEl=document.querySelector('.hud'), mapwrap=document.getElementById('mapwrap'), slot=document.getElementById('personslot'), panelEl=document.getElementById('panel');
+function applyLayout(){
+  PHONE=phoneMQ.matches; COARSE=coarseMQ.matches||PHONE;
+  if(PHONE){ hudEl.classList.add('band'); mapwrap.parentNode.insertBefore(hudEl,mapwrap); slot.appendChild(personEl); }
+  else { hudEl.classList.remove('band'); mapwrap.insertBefore(hudEl,mapwrap.querySelector('.views')); panelEl.insertBefore(personEl,panelEl.children[1]); }
+  tapcard.hidden=true; setPlayUI(); resize(); if(S.follow) stepCamera(true);
+}
+phoneMQ.addEventListener('change',applyLayout); coarseMQ.addEventListener('change',applyLayout);
 window.addEventListener('resize',()=>{ resize(); if(S.follow) stepCamera(true); });
+applyLayout();
 resize(); setFollow(true); stepCamera(true); frameUpdate(); setPlayUI(); requestDraw();
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>requestDraw());
-window.__atlas={S,warpTotal:()=>warpTotal,setYear,people};
+window.__atlas={S,warpTotal:()=>warpTotal,setYear,people,firstHit:()=>{draw();const h=hoverHits[0];return {x:h.x,y:h.y};}};
 })();
 </script>
